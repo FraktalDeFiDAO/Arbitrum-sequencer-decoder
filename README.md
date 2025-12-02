@@ -57,7 +57,8 @@ This project follows the principles from [HumanLayer.dev's Claude.md guide](http
 
 To begin implementation:
 1. Familiarize yourself with the [Git Workflow](GIT_WORKFLOW.md) and development standards
-2. Create the directory structure as outlined in `CLAUDE.md`
-3. Implement the decoder packages following the specifications in `agent_docs/`
-4. Use the test data in `testdata/sequencer/` for validation
-5. Follow the build and testing guidelines in `agent_docs/build_and_test.md`
+2. Review the [Project Plan](PROJECT_PLAN.md) for a detailed roadmap
+3. Create the directory structure as outlined in `CLAUDE.md`
+4. Implement the decoder packages following the specifications in `agent_docs/`
+5. Use the test data in `testdata/sequencer/` for validation
+6. Follow the build and testing guidelines in `agent_docs/build_and_test.md`
