@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Pre-push hook for Arbitrum-sequencer-decoder project
+# Performs checks before allowing a push
+
+# Get branch names
+LOCAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+REMOTE_BRANCH="origin/$LOCAL_BRANCH"
+
+echo "Running pre-push checks for branch: $LOCAL_BRANCH"
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Run tests before pushing to develop or main
+if [ "$LOCAL_BRANCH" = "develop" ] || [ "$LOCAL_BRANCH" = "main" ]; then
+    echo "Running tests before pushing to protected branch..."
+    if command_exists go; then
+        if ! go test ./... -v; then
+            echo "Error: Tests failed, cannot push to $LOCAL_BRANCH"
+            exit 1
+        fi
+    else
+        echo "Warning: go not found, skipping tests"
+    fi
+fi
+
+# Check branch naming convention
+if [ "$LOCAL_BRANCH" != "main" ] && [ "$LOCAL_BRANCH" != "develop" ]; then
+    # Check if the branch follows the expected patterns
+    if ! echo "$LOCAL_BRANCH" | grep -E "^(feature|fix|hotfix|release)/.*" > /dev/null 2>&1; then
+        echo "Error: Branch name '$LOCAL_BRANCH' does not follow convention."
+        echo "Expected format: feature/issue-description, fix/issue-description, hotfix/issue-description, or release/version"
+        exit 1
+    fi
+fi
+
+# Check if we're in the right directory
+if [ ! -f "go.mod" ]; then
+    echo "Not in project root directory, skipping pre-push checks"
+    exit 0
+fi
+
+echo "Pre-push checks passed!"
+exit 0
