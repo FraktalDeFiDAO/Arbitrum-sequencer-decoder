@@ -5,6 +5,12 @@
 
 # Determine the destination branch being pushed to
 while read local_ref local_sha remote_ref remote_sha; do
+    # Skip checks for tags
+    if echo "$remote_ref" | grep -q "^refs/tags/"; then
+        echo "Pushing tag: $remote_ref - skipping branch checks"
+        continue
+    fi
+
     DEST_BRANCH=$(echo "$remote_ref" | sed 's|refs/heads/||')
 
     echo "Running pre-push checks for branch: $DEST_BRANCH"
