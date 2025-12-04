@@ -1,0 +1,133 @@
+# Woodpecker CI/CD pipeline for Arbitrum Sequencer Decoder
+
+pipeline:
+  # Format and linting stage
+  format:
+    image: golang:1.25
+    commands:
+      - go fmt ./...
+      - go vet ./...
+      - test -z $(gofmt -l .) || (gofmt -l . && exit 1)
+    when:
+      event: [pull_request, push]
+      branch: [main, develop]
+
+  lint:
+    image: golang:1.25
+    commands:
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - golangci-lint run --timeout=5m
+    when:
+      event: [pull_request, push]
+      branch: [main, develop]
+
+  # Unit testing stage
+  test:
+    image: golang:1.25
+    commands:
+      - go mod download
+      - go test -v -race ./...
+      - go test -v -coverprofile=coverage.txt -covermode=atomic ./...
+    when:
+      event: [pull_request, push]
+      branch: [main, develop]
+
+  # Security scanning stage
+  security:
+    image: securego/gosec:v2.20.0
+    commands:
+      - gosec -fmt=json -out=gosec-report.json -stdout ./...
+    when:
+      event: [pull_request, push]
+      branch: [main, develop]
+
+  # Coverage analysis
+  coverage:
+    image: golang:1.25
+    commands:
+      - go tool cover -func=coverage.txt
+    when:
+      event: [pull_request, push]
+      branch: [main, develop]
+    depends_on: [test]
+
+  # Building stage
+  build:
+    image: golang:1.25
+    commands:
+      - go mod download
+      - go build -o bin/sequencer-reader ./cmd/sequencer-reader
+      - go build -o bin/sequencer-capture ./cmd/sequencer-capture
+    when:
+      event: [pull_request, push]
+      branch: [main, develop]
+
+  # Integration tests (only on main branch)
+  integration-test:
+    image: golang:1.25
+    commands:
+      - go test -v ./pkg/... -tags=integration
+    when:
+      event: [push]
+      branch: [main]
+    depends_on: [build]
+
+  # Performance tests (only on main branch)
+  performance-test:
+    image: golang:1.25
+    commands:
+      - go test -bench=. -benchmem ./pkg/simulator/...
+      - go test -bench=. -benchmem ./pkg/decoder/...
+    when:
+      event: [push]
+      branch: [main]
+    depends_on: [integration-test]
+
+  # Docker build stage
+  docker-build:
+    image: woodpeckerci/plugin-docker-buildx
+    settings:
+      dockerfile: Dockerfile
+      repo: your-registry/arb-sequencer-decoder
+      tag: ${CI_COMMIT_SHA}
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+    when:
+      event: [push]
+      branch: [main]
+    depends_on: [performance-test]
+
+  # Deploy to staging (on main branch)
+  deploy-staging:
+    image: alpine:latest
+    commands:
+      - apk add --no-cache curl
+      # Deployment commands would go here
+    when:
+      event: [push]
+      branch: [main]
+    depends_on: [docker-build]
+    secrets: [staging_deployment_key]
+
+  # Deploy to production (only on tags)
+  deploy-production:
+    image: alpine:latest
+    commands:
+      - apk add --no-cache curl
+      # Deployment commands would go here
+    when:
+      event: [tag]
+    depends_on: [docker-build]
+    secrets: [production_deployment_key]
+
+secrets:
+  - docker_username
+  - docker_password
+  - staging_deployment_key
+  - production_deployment_key
+
+# Only clone the repository to the depth of the current commit
+clone:
+  depth: 1

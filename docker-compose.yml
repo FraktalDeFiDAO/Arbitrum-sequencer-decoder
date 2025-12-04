@@ -1,0 +1,135 @@
+version: '3.8'
+
+services:
+  # Arbitrum Sequencer Decoder main service
+  sequencer-reader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["./sequencer-reader", "-rpc", "${RPC_URL:-https://arb1.arbitrum.io/rpc}", "-log-level", "${LOG_LEVEL:-info}"]
+    ports:
+      - "8081:8080"  # Host 8081 -> Container 8080 (8080 often in use)
+    environment:
+      - RPC_URL=${RPC_URL:-https://arb1.arbitrum.io/rpc}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - ./testdata:/app/testdata:ro
+      - sequencer-data:/app/data
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - arbitrum-net
+
+  # Transaction capture service
+  sequencer-capture:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["./sequencer-capture", "-rpc", "${RPC_URL:-https://arb1.arbitrum.io/rpc}", "-output", "/app/data/captured_txs.jsonl"]
+    environment:
+      - RPC_URL=${RPC_URL:-https://arb1.arbitrum.io/rpc}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    depends_on:
+      - redis
+    networks:
+      - arbitrum-net
+
+  # Redis for caching and temporary data storage
+  redis:
+    image: docker.io/library/redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - arbitrum-net
+
+  # PostgreSQL for persistent data storage
+  postgres:
+    image: docker.io/library/postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-arbitrum_decoder}
+      POSTGRES_USER: ${POSTGRES_USER:-arbuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arbpwd}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    networks:
+      - arbitrum-net
+
+  # Monitoring stack
+  prometheus:
+    image: docker.io/prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command: --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus
+    restart: unless-stopped
+    networks:
+      - arbitrum-net
+
+  grafana:
+    image: docker.io/grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_DATABASE_TYPE=postgres
+      - GF_DATABASE_HOST=postgres:5432
+      - GF_DATABASE_NAME=${POSTGRES_DB:-arbitrum_decoder}
+      - GF_DATABASE_USER=${POSTGRES_USER:-arbuser}
+      - GF_DATABASE_PASSWORD=${POSTGRES_PASSWORD:-arbpwd}
+      - GF_DATABASE_SSL_MODE=disable
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/datasources:/etc/grafana/provisioning/datasources
+    restart: unless-stopped
+    networks:
+      - arbitrum-net
+    depends_on:
+      - prometheus
+
+  # Development tools container with Go environment
+  dev-tools:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    volumes:
+      - .:/app
+      - go-mod-cache:/go/pkg/mod
+    working_dir: /app
+    command: tail -f /dev/null
+    environment:
+      - GOPATH=/go
+      - GOCACHE=/tmp/go-build
+    networks:
+      - arbitrum-net
+    ports:
+      - "4369:4369"  # For delve debugger if needed
+
+volumes:
+  sequencer-data:
+  redis-data:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+  go-mod-cache:
+
+networks:
+  arbitrum-net:
+    driver: bridge

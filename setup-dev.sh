@@ -81,8 +81,8 @@ echo
 echo "Development environment setup complete!"
 echo
 echo "Next steps:"
-echo "1. Review GIT_WORKFLOW.md for branching and commit standards"
-echo "2. Review BRANCH_PROTECTION.md for protected branch rules"
+echo "1. Review docs/general/GIT_WORKFLOW.md for branching and commit standards"
+echo "2. Review docs/general/BRANCH_PROTECTION.md for protected branch rules"
 echo "3. Review agent_docs/ for technical implementation details"
 echo "4. Create your first feature branch: git checkout -b feature/description"
 echo

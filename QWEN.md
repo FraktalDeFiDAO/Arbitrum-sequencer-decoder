@@ -10,11 +10,13 @@ The project is built in Go (version 1.25+) and focuses on reading raw sequencer 
 
 The core components of the system are organized as follows:
 - `cmd/sequencer-reader/` – Reads sequencer stream
+- `cmd/sequencer-capture/` – Captures and stores transactions for analysis
 - `pkg/decoder/` – Decodes DEX calldata in pure Go
 - `pkg/simulator/` – Estimates post-swap prices without EVM
 - `pkg/oracle/` – Tracks in-memory pool states
 - `pkg/arb-engine/` – Finds arbitrage across like pools
 - `pkg/executor/` – Submits MEV-safe bundles
+- `pkg/types/` – Common types and interfaces
 
 ## Supported DEXes
 
@@ -57,13 +59,31 @@ The system supports multiple decentralized exchanges:
 
 ### Build Commands
 ```bash
-go build -tags=arbitrum -o bin/arb-engine ./cmd/...
+# Build sequencer reader
+go build -o bin/sequencer-reader ./cmd/sequencer-reader
+
+# Build sequencer capture
+go build -o bin/sequencer-capture ./cmd/sequencer-capture
 ```
 
-### Testing
+### Running
 ```bash
-go test ./pkg/decoder -run TestUniswapV3Decoder -v
+# Run sequencer reader
+./bin/sequencer-reader -rpc https://arb1.arbitrum.io/rpc
+
+# Run sequencer capture
+./bin/sequencer-capture -rpc https://arb1.arbitrum.io/rpc -output ./testdata/sequencer/captured_txs.jsonl
 ```
+
+## Development Status
+
+Based on the [PROJECT_PROGRESS.md](docs/project_planning/PROJECT_PROGRESS.md):
+- ✅ Phase 1.1: Go module and directory structure
+- ✅ Phase 1.2: CLI framework in cmd/sequencer-reader
+- ✅ Phase 1.3: Common types and interfaces in pkg/types
+- ✅ Phase 1.4: Transaction capture in cmd/sequencer-capture
+- Next: Phase 2: Core Infrastructure (Tasks 2.1-2.4)
+- Then: Phase 3: DEX Decoder Implementation (Tasks 3.1-3.28)
 
 ## Development Conventions
 
@@ -79,6 +99,8 @@ go test ./pkg/decoder -run TestUniswapV3Decoder -v
 
 ## Key Files and Directories
 
+- `docs/project_planning/PROJECT_PLAN.md` - Detailed project roadmap and task breakdown
+- `docs/project_planning/PROJECT_PROGRESS.md` - Current implementation status and task tracking
 - `CLAUDE.md` - Main project overview and architecture description
 - `agent_docs/` - Detailed documentation for each supported DEX and development workflows
 - `testdata/sequencer/` - Sample data for various DEX swaps including Camelot V3, Curve, and other transaction types
